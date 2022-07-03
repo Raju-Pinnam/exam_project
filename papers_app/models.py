@@ -38,7 +38,7 @@ class Question(models.Model):
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE)
     
     def __str__(self):
-        return f"{self.question}-{self.subject}-{self.marks}"
+        return f"{self.question}-{self.subject}-{self.question_marks}"
 
 
 class TestPaper(models.Model):
@@ -63,10 +63,16 @@ class TestPaper(models.Model):
     setter = models.ForeignKey(User, on_delete=models.CASCADE,
                                related_name="set_papers")
     checker = models.ForeignKey(User, on_delete=models.DO_NOTHING,
-                               related_name="checked_papers")
+                               related_name="checked_papers",
+                               blank=True,
+                               null=True)
     examiner = models.ForeignKey(User, on_delete=models.DO_NOTHING,
-                               related_name="examined_papers")
-    checker_review = models.TextField()
-    examiner_review = models.TextField()
+                               related_name="examined_papers",
+                               blank=True,
+                               null=True)
+    checker_review = models.TextField(blank=True,
+                               null=True)
+    examiner_review = models.TextField(blank=True,
+                               null=True)
     is_approved = models.BooleanField(default=False)
 

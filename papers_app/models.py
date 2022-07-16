@@ -3,26 +3,30 @@ from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
-class Answer(models.Model):
-    """
-    Answer For Question For now i have added Only text base answer
-    For this if you guys want add image answer or mutliple choises also
-    """
-    answer = models.TextField()
-    question = models.ForeignKey('Question', on_delete=models.CASCADE)
-    
-    def __str__(self):
-        return f"Answer is for {self.question}"
-
-
 class Subject(models.Model):
     """
     SUbject Name
     """
     subject_name = models.CharField(max_length=64)
-    
-    def __str__(self):
+    is_delete = models.BooleanField(default=False)
+    is_active = models.BooleanField(default = True)
+    created_at = models.DateTimeField(auto_now_add=True)    
+
+    def _str_(self):
         return self.subject_name
+
+class Profile(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user_role_choice =((0,'Setter'),(2 ,'Examinar'),(1,'Checker')) 
+    profile_choice = models.CharField(max_length=10, choices = user_role_choice)
+    subject  = models.ForeignKey(Subject, on_delete=models.CASCADE, null=True,
+    blank=True)
+    mobile_number = models.CharField(max_length=12)
+
+    def __str__(self):
+        return f"{self.user.username} - profile"
+
+
 
 class Question(models.Model):
     """
@@ -36,9 +40,28 @@ class Question(models.Model):
     creater = models.ForeignKey(User, on_delete=models.CASCADE)
     question_marks = models.IntegerField(default=0)
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE)
-    
-    def __str__(self):
+    is_delete = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+
+    def _str_(self):
         return f"{self.question}-{self.subject}-{self.question_marks}"
+
+class Answer(models.Model):
+    
+    """
+    Answer For Question For now i have added Only text base answer
+    For this if you guys want add image answer or mutliple choises also
+    """
+
+    Answer_type = (('TEXT','text_type'),('IMAGE','image_type'),('AUDIO','audio_type'))
+    answer_type = models.CharField(max_length=10,choices = Answer_type, blank=True, null=True)
+    answer = models.TextField()
+    question = models.ForeignKey(Question,  on_delete=models.CASCADE)
+    is_delete = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+    
+    def _str_(self):
+        return f"Answer is for {self.question}"
 
 
 class TestPaper(models.Model):
@@ -47,9 +70,9 @@ class TestPaper(models.Model):
     questions = One question can be in number of papers and one paper contains many questions
     total_marks = marks for this paper
     subject = for which subject belongs to this paper 
-              if subject deleted then Test paper also be deleted
+            if subject deleted then Test paper also be deleted
     setter = He is Lecturer
-             if he is removed then Test paper also be deleted
+            if he is removed then Test paper also be deleted
     checker = 
     examiner 
     checker_review
@@ -57,22 +80,40 @@ class TestPaper(models.Model):
     is_approved = Is finally paper approved or not
     """
     number_of_questions = models.IntegerField()
-    questions = models.ManyToManyField(Question)
+    questions = models.ManyToManyField(Question, default=[])
     total_marks = models.IntegerField()
+    cut_off_marks =models.PositiveIntegerField()
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE)
     setter = models.ForeignKey(User, on_delete=models.CASCADE,
-                               related_name="set_papers")
+                            related_name="set_papers")
     checker = models.ForeignKey(User, on_delete=models.DO_NOTHING,
-                               related_name="checked_papers",
-                               blank=True,
-                               null=True)
+                            related_name="checked_papers",
+                            blank=True,
+                            null=True)
     examiner = models.ForeignKey(User, on_delete=models.DO_NOTHING,
-                               related_name="examined_papers",
-                               blank=True,
-                               null=True)
+                            related_name="examined_papers",
+                            blank=True,
+                            null=True)
     checker_review = models.TextField(blank=True,
-                               null=True)
+                            null=True)
     examiner_review = models.TextField(blank=True,
-                               null=True)
-    is_approved = models.BooleanField(default=False)
+                            null=True)
+    is_sent_for_cheeck = models.BooleanField(default=False)
+    is_checker_approved = models.BooleanField(default=False)
+    is_examinar_approved = models.BooleanField(default=False)
+    is_active = models.BooleanField(default = True)
+    is_delete = models.BooleanField(default=False)
+    created_at = models.DateTimeField( auto_now_add=True)
+    updated_at = models.DateTimeField( auto_now=True)
 
+class CheckingTestPaper(models.Model):
+    test_paper = models.ForeignKey(TestPaper,related_name = 'test_check', on_delete= models.CASCADE)
+    checker_review = models.TextField(blank=True,
+                            null=True)
+    is_checker_approved = models.BooleanField(default=False)
+
+class ApprovedTestPaper(models.Model):
+    test_paper = models.ForeignKey(TestPaper,related_name = 'test_approve',on_delete= models.CASCADE)
+    examiner_review = models.TextField(blank=True,
+                            null=True)
+    is_examiner_approved = models.BooleanField(default=False)

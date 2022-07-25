@@ -1,8 +1,9 @@
+from urllib import response
 from django.shortcuts import get_object_or_404
 from django.views.generic import View
 from django.db import transaction
 from django.contrib.auth import get_user_model
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.contrib.postgres.aggregates import ArrayAgg
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -10,7 +11,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.generics import CreateAPIView
 
-from .models import Question, Answer, TestPaper, Profile, Subject
+from .models import CheckingTestPaper, Question, Answer, TestPaper, Profile, Subject
 from .serializers import (SubjectSerializer, ProfileSerializer, QuestionSerializer,
 QuestionDetailSerializer)
 
@@ -189,9 +190,6 @@ class TestPaperSetterSubmission(APIView):
             setter_id=user.id,
             is_active=True,
             is_delete=False,
-            checker__isnull=True,
-            is_checker_approved=False,
-            is_examinar_approved=False,
             is_sent_for_cheeck=False
         ).annotate(question=ArrayAgg('questions__question'),
         answers=ArrayAgg('questions__answer__answer')
@@ -209,3 +207,51 @@ class TestPaperSetterSubmission(APIView):
         testpepr_obj.is_sent_for_cheeck = True
         testpepr_obj.save()
         return Response({"message": "Sent For checking"}, status=status.HTTP_200_OK)
+
+class TestPaperCheckerAcception(APIView):
+    model = TestPaper
+    
+    def get(self, request):
+        qp_id = request.query_params.get('testpaper_id')
+        testpaper = self.model.objects.get(id=qp_id)
+        # TODO ned to update after authorization
+        user = User.objects.filter(profile__profile_choice=1).first()
+        testpaper.checker = user
+        testpaper.save()
+        response = {
+            "message": "Accepted For checking",
+            "id": qp_id,
+            "Number of Questions": testpaper.number_of_questions,
+            "questions": testpaper.questions.values_list('question', flat=True),
+            "Total Marks": testpaper.total_marks,
+            "Cut Off Marks": testpaper.cut_off_marks
+        }
+        return Response(response, status=status.HTTP_200_OK)
+    
+    def post(self, request):
+        import json
+        data = request.data
+        if "testpaper_id" not in data:
+            return Response({"message": "Test Paper is Required"}, status=status.HTTP_400_BAD_REQUEST)
+        testpaper_obj = get_object_or_404(TestPaper, id=data['testpaper_id'])
+        if "approval" not in data:
+            return Response({"message": "Approval is Required"}, status=status.HTTP_400_BAD_REQUEST)
+        checker_message = data.get('messgae')
+        approval = data['approval'] == "True"
+        testpaper_obj.is_checker_approved = approval
+        check_paper_obj, is_created = CheckingTestPaper.objects.get_or_create(test_paper_id=testpaper_obj.id)
+        testpaper_obj.checker_review = checker_message
+        check_paper_obj.checker_review = checker_message
+        check_paper_obj.is_checker_approved = approval
+        check_paper_obj.save()
+        response = {
+            'message': 'paper is approved By Checker Sent to Examiner'
+        }
+        if not approval:
+            testpaper_obj.checker = None
+            testpaper_obj.is_sent_for_cheeck = False
+            response['message'] = "Paper is Not approved please check"
+        testpaper_obj.save()
+        return Response(response, status=status.HTTP_200_OK)
+
+

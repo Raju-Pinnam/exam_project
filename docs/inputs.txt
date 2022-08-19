@@ -1,0 +1,7 @@
+1. Need to get Examination Office
+
+subjects - English, Maths
+Lecture - question (can be used by any Lecture) ans also be prepared
+Lecture(checker) - can be any Lecture - review if okay examiner, else send back to setter
+Lecture(examiner) - review if okay approve else send to setter
+

@@ -123,7 +123,7 @@ USE_I18N = True
 USE_TZ = True
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:4000",
+    "http://localhost:4200",
 ]
 
 # Static files (CSS, JavaScript, Images)

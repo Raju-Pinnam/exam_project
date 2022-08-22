@@ -78,13 +78,14 @@ class UserDetails(APIView):
         return Response({"result": data}, status=status.HTTP_200_OK)
 
 
-@api_view(['GET'])
-def get_subjects_list(request):
-    subjects = Subject.objects.filter(is_active=True,
-                                    is_delete=False)
-    serializer = SubjectSerializer(subjects, many=True).data
-    print(serializer)
-    return Response({"result":serializer}, status=status.HTTP_200_OK)
+class SubjectsList(APIView):
+    
+    def get(self, request, *args, **kwargs):
+        subjects = Subject.objects.filter(is_active=True,
+                                        is_delete=False)
+        serializer = SubjectSerializer(subjects, many=True).data
+        print(serializer)
+        return Response({"result":serializer}, status=status.HTTP_200_OK)
 
 
 class QuestionApiView(APIView):
@@ -160,7 +161,7 @@ class TestPaperCreationView(CreateAPIView):
                 total_marks=Sum('question_marks'))['total_marks']
         if 'cut_off_marks' not in data:
             return Response({"message": "Need to mention Cut Off Marks"}, status=status.HTTP_400_BAD_REQUEST)
-        cutoffmarks = data['cut_off_marks']
+        cutoffmarks = int(data['cut_off_marks'])
         if cutoffmarks > total_marks:
             return Response({"message": "Cut Off Marks Are greater than Total marks"}, status=status.HTTP_400_BAD_REQUEST)
         # TODO ned to update after authorization
@@ -177,6 +178,25 @@ class TestPaperCreationView(CreateAPIView):
         test_paper_obj.save()
         return Response({"message": "Test Paper is created"}, status=status.HTTP_201_CREATED)
 
+class TestPaperListView(APIView):
+    model = TestPaper
+    queryset = TestPaper.objects.filter(is_active=True,
+            is_delete=False)
+    
+    def get(self, request, *args, **kwargs):
+        # TODO ned to update after authorization
+        user = User.objects.filter(profile__profile_choice=0).first()
+        test_papers = TestPaper.objects.filter(
+            # setter_id=user.id,
+            is_active=True,
+            is_delete=False,
+        ).annotate(question=ArrayAgg('questions__question'),
+        answers=ArrayAgg('questions__answer__answer')
+        ).values('question', 'answers', 'total_marks', 'cut_off_marks',
+        'subject__subject_name', 'is_checker_approved', 'is_examinar_approved',
+        'checker_review', 'examiner_review'
+        )
+        return Response({"result": test_papers}, status=status.HTTP_200_OK)
 
 class TestPaperSetterSubmission(APIView):
     model = TestPaper

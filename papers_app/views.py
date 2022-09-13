@@ -10,6 +10,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.generics import CreateAPIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.authtoken.models import Token
 
 from .models import CheckingTestPaper, Question, Answer, TestPaper, Profile, Subject
 from .serializers import (SubjectSerializer, ProfileSerializer, QuestionSerializer,
@@ -58,24 +60,28 @@ class UserCreation(APIView):
         )
         user_obj.set_password(params['password'])
         user_obj.save()
+        Token.objects.create(user=user_obj)
         profile = Profile.objects.create(
             user=user_obj,
             subject_id=params['subject'],
             profile_choice=params['profile_choice'],
             mobile_number=contact
         )
-
         data = ProfileSerializer(profile, many=False).data
         transaction.commit()
         return Response({"result": data}, status=status.HTTP_201_CREATED)
 
 class UserDetails(APIView):
+    permission_classes = [IsAuthenticated]
+    
 
     def get(self, request, *args, **kwargs):
-        pk = request.query_params.get('profile_id')
+        # pk = request.query_params.get('profile_id')
+        user = request.user
+        pk = user.profile_set.first().id
         profile_obj = get_object_or_404(Profile, id=pk)
         data = ProfileSerializer(profile_obj, many=False).data
-        return Response({"result": data}, status=status.HTTP_200_OK)
+        return Response(data, status=status.HTTP_200_OK)
 
 
 class SubjectsList(APIView):
@@ -92,6 +98,8 @@ class QuestionApiView(APIView):
     model = Question
     queryset = Question.objects.filter(is_active=True,
     is_delete=False)
+    permission_classes = [IsAuthenticated]
+    
 
     def get(self, request, *args, **kwargs):
         params = request.query_params
@@ -119,7 +127,7 @@ class QuestionApiView(APIView):
         question = data['question']
         marks = data['q_marks']
         # TODO ned to update after authorization
-        user = User.objects.filter(profile__profile_choice=0).last()
+        user = request.user
         subject = user.profile_set.first().subject
         if 'answer' not in data:
             return Response({"message": "Answer deails should provide"},
@@ -148,6 +156,8 @@ class QuestionApiView(APIView):
 
 class TestPaperCreationView(CreateAPIView):
     model = TestPaper
+    permission_classes = [IsAuthenticated]
+    
 
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -165,7 +175,7 @@ class TestPaperCreationView(CreateAPIView):
         if cutoffmarks > total_marks:
             return Response({"message": "Cut Off Marks Are greater than Total marks"}, status=status.HTTP_400_BAD_REQUEST)
         # TODO ned to update after authorization
-        user = User.objects.filter(profile__profile_choice=0).last()
+        user = request.user
         subject = user.profile_set.first().subject
         test_paper_obj = self.model.objects.create(
             total_marks=total_marks,
@@ -182,14 +192,22 @@ class TestPaperListView(APIView):
     model = TestPaper
     queryset = TestPaper.objects.filter(is_active=True,
             is_delete=False)
+    permission_classes = [IsAuthenticated]
     
     def get(self, request, *args, **kwargs):
-        # TODO ned to update after authorization
-        user = User.objects.filter(profile__profile_choice=0).first()
+        params = request.query_params
+        user = request.user
+        
+        query_dict = {'is_active': True,
+                    'is_delete': False,
+                    'setter_id': user.id,
+                    }
+        if 'is_sent_checker' in params:
+            query_dict['checker__isnull'] = False
+        if 'is_sent_examiner' in params:
+            query_dict['examiner__isnull'] = False
         test_papers = TestPaper.objects.filter(
-            # setter_id=user.id,
-            is_active=True,
-            is_delete=False,
+           **query_dict
         ).annotate(question=ArrayAgg('questions__question'),
         answers=ArrayAgg('questions__answer__answer')
         ).values('question', 'answers', 'total_marks', 'cut_off_marks',
@@ -205,7 +223,7 @@ class TestPaperSetterSubmission(APIView):
 
     def get(self, request, *args, **kwargs):
         # TODO ned to update after authorization
-        user = User.objects.filter(profile__profile_choice=0).first()
+        user =request.user
         test_papers = TestPaper.objects.filter(
             setter_id=user.id,
             is_active=True,
@@ -230,12 +248,14 @@ class TestPaperSetterSubmission(APIView):
 
 class TestPaperCheckerAcception(APIView):
     model = TestPaper
+    permission_classes = [IsAuthenticated]
+    
     
     def get(self, request):
         qp_id = request.query_params.get('testpaper_id')
         testpaper = self.model.objects.get(id=qp_id)
         # TODO ned to update after authorization
-        user = User.objects.filter(profile__profile_choice=1).first()
+        user = request.user
         testpaper.checker = user
         testpaper.save()
         response = {

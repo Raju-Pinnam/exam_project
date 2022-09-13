@@ -11,6 +11,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     
     def to_representation(self, instance):
         # data = super().to_representation(instance)
+        user_choices = dict([("0",'Setter'),("2" ,'Examinar'),("1",'Checker')])
         return {
             'id': instance.id,
             'user_id': instance.user.id,
@@ -20,7 +21,7 @@ class ProfileSerializer(serializers.ModelSerializer):
             'email': instance.user.email,
             'contact': instance.mobile_number,
             'subject': instance.subject.subject_name if instance.subject else None,
-            'profile_choice': instance.profile_choice,
+            'profile_choice': user_choices.get(instance.profile_choice)
         }
 
 

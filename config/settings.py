@@ -41,6 +41,8 @@ INSTALLED_APPS = [
 
     'django_extensions',
     "corsheaders",
+    'rest_framework.authtoken',
+    
 
     'papers_app'
 ]
@@ -125,6 +127,18 @@ USE_TZ = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:4200",
 ]
+
+# from rest_framework.authentication import TokenAuthentication
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSIOM_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ]
+}
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.0/howto/static-files/

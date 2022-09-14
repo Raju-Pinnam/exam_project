@@ -116,7 +116,7 @@ class QuestionApiView(APIView):
             question_objs = self.queryset.filter(**dilo)
         data = QuestionSerializer(question_objs, many=True).data
         return Response(
-            {"result": data,}, status=status.HTTP_200_OK
+             data, status=status.HTTP_200_OK
         )
 
     def post(self, request, *args, **kwargs):
@@ -161,6 +161,7 @@ class TestPaperCreationView(CreateAPIView):
 
     def post(self, request, *args, **kwargs):
         data = request.data
+        print(data)
         if "questions" not in data:
             return Response({"message": "Need Questions"}, status=status.HTTP_400_BAD_REQUEST)
         questions = data['questions'].split(",")
@@ -174,7 +175,6 @@ class TestPaperCreationView(CreateAPIView):
         cutoffmarks = int(data['cut_off_marks'])
         if cutoffmarks > total_marks:
             return Response({"message": "Cut Off Marks Are greater than Total marks"}, status=status.HTTP_400_BAD_REQUEST)
-        # TODO ned to update after authorization
         user = request.user
         subject = user.profile_set.first().subject
         test_paper_obj = self.model.objects.create(
@@ -209,10 +209,11 @@ class TestPaperListView(APIView):
         test_papers = TestPaper.objects.filter(
            **query_dict
         ).annotate(question=ArrayAgg('questions__question'),
+                   question_ids=ArrayAgg('questions'),
         answers=ArrayAgg('questions__answer__answer')
-        ).values('question', 'answers', 'total_marks', 'cut_off_marks',
+        ).values("id", 'question', 'answers', 'total_marks', 'cut_off_marks',
         'subject__subject_name', 'is_checker_approved', 'is_examinar_approved',
-        'checker_review', 'examiner_review'
+        'checker_review', 'examiner_review', 'question_ids'
         )
         return Response({"result": test_papers}, status=status.HTTP_200_OK)
 

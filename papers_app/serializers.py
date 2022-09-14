@@ -21,6 +21,7 @@ class ProfileSerializer(serializers.ModelSerializer):
             'email': instance.user.email,
             'contact': instance.mobile_number,
             'subject': instance.subject.subject_name if instance.subject else None,
+            'subject_id': instance.subject.id if instance.subject else 0,
             'profile_choice': user_choices.get(instance.profile_choice)
         }
 

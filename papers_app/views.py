@@ -43,9 +43,9 @@ class UserCreation(APIView):
         if 'subject' not in params:
             return Response({"message": "subject is required field"},
             status=status.HTTP_400_BAD_REQUEST)
-        if 'profile_choice' not in params:
-            return Response({"message": "profile_choice is required field"},
-            status=status.HTTP_400_BAD_REQUEST)
+        # if 'profile_choice' not in params:
+        #     return Response({"message": "profile_choice is required field"},
+        #     status=status.HTTP_400_BAD_REQUEST)
         email = params['email']
         lookup = Q(user__email=email) | Q(mobile_number=contact)
         if Profile.objects.filter(lookup).exists():
@@ -64,7 +64,7 @@ class UserCreation(APIView):
         profile = Profile.objects.create(
             user=user_obj,
             subject_id=params['subject'],
-            profile_choice=params['profile_choice'],
+            # profile_choice=params['profile_choice'],
             mobile_number=contact
         )
         data = ProfileSerializer(profile, many=False).data
@@ -90,8 +90,7 @@ class SubjectsList(APIView):
         subjects = Subject.objects.filter(is_active=True,
                                         is_delete=False)
         serializer = SubjectSerializer(subjects, many=True).data
-        print(serializer)
-        return Response({"result":serializer}, status=status.HTTP_200_OK)
+        return Response(serializer, status=status.HTTP_200_OK)
 
 
 class QuestionApiView(APIView):

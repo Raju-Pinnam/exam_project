@@ -126,9 +126,12 @@ class QuestionApiView(APIView):
             status=status.HTTP_400_BAD_REQUEST)
         question = data['question']
         marks = data['q_marks']
-        # TODO ned to update after authorization
         user = request.user
-        subject = user.profile_set.first().subject
+        if "subject" in data:
+            subject_id = data['subject']
+        else:
+            subject = user.profile_set.first().subject
+            subject_id = subject.id
         if 'answer' not in data:
             return Response({"message": "Answer deails should provide"},
             status=status.HTTP_400_BAD_REQUEST)
@@ -140,7 +143,7 @@ class QuestionApiView(APIView):
         que_obj = Question.objects.create(
             question=question,
             creater_id=user.id,
-            subject_id=subject.id,
+            subject_id=subject_id,
             question_marks=marks
         )
         answer_obj = Answer.objects.create(
@@ -150,7 +153,7 @@ class QuestionApiView(APIView):
         )
         seriliazer = QuestionDetailSerializer(answer_obj, many=False)
         transaction.commit()
-        return Response({"result": seriliazer.data},
+        return Response(seriliazer.data,
         status=status.HTTP_201_CREATED)
 
 

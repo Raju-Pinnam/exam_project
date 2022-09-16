@@ -17,14 +17,14 @@ class Subject(models.Model):
 
 class Profile(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    user_role_choice =((0,'Setter'),(2 ,'Examinar'),(1,'Checker')) 
+    user_role_choice =(('0','Setter'),('2' ,'Examinar'),('1','Checker')) 
     profile_choice = models.CharField(max_length=10, choices = user_role_choice, default='0')
     subject  = models.ForeignKey(Subject, on_delete=models.CASCADE, null=True,
     blank=True)
     mobile_number = models.CharField(max_length=12)
 
     def __str__(self):
-        return f"{self.user.username} - profile"
+        return f"{self.user.username} - profile - {self.profile_choice}"
 
 
 

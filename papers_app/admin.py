@@ -10,6 +10,7 @@ class SubjectAdmin(admin.ModelAdmin):
 
 
 admin.site.register(Answer)
+admin.site.register(Profile)
 # admin.site.register(Subject)
 admin.site.register(Question)
 admin.site.register(TestPaper)

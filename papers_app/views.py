@@ -3,7 +3,7 @@ from django.shortcuts import get_object_or_404
 from django.views.generic import View
 from django.db import transaction
 from django.contrib.auth import get_user_model
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, Case, When, BooleanField
 from django.contrib.postgres.aggregates import ArrayAgg
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -20,7 +20,7 @@ QuestionDetailSerializer)
 User = get_user_model()
 
 class UserCreation(APIView):
-    
+
     def post(self, request, *args, **kwargs):
         params = request.data
         if 'username' in params:
@@ -73,7 +73,7 @@ class UserCreation(APIView):
 
 class UserDetails(APIView):
     permission_classes = [IsAuthenticated]
-    
+
 
     def get(self, request, *args, **kwargs):
         # pk = request.query_params.get('profile_id')
@@ -85,7 +85,7 @@ class UserDetails(APIView):
 
 
 class SubjectsList(APIView):
-    
+
     def get(self, request, *args, **kwargs):
         subjects = Subject.objects.filter(is_active=True,
                                         is_delete=False)
@@ -98,7 +98,7 @@ class QuestionApiView(APIView):
     queryset = Question.objects.filter(is_active=True,
     is_delete=False)
     permission_classes = [IsAuthenticated]
-    
+
 
     def get(self, request, *args, **kwargs):
         params = request.query_params
@@ -159,11 +159,10 @@ class QuestionApiView(APIView):
 class TestPaperCreationView(CreateAPIView):
     model = TestPaper
     permission_classes = [IsAuthenticated]
-    
+
 
     def post(self, request, *args, **kwargs):
         data = request.data
-        print(data)
         if "questions" not in data:
             return Response({"message": "Need Questions"}, status=status.HTTP_400_BAD_REQUEST)
         questions = data['questions'].split(",")
@@ -195,27 +194,37 @@ class TestPaperListView(APIView):
     queryset = TestPaper.objects.filter(is_active=True,
             is_delete=False)
     permission_classes = [IsAuthenticated]
-    
+
     def get(self, request, *args, **kwargs):
         params = request.query_params
         user = request.user
-        
+
         query_dict = {'is_active': True,
                     'is_delete': False,
                     'setter_id': user.id,
                     }
         if 'is_sent_checker' in params:
-            query_dict['checker__isnull'] = False
+            query_dict['is_sent_for_cheeck'] = True
+            query_dict['is_checker_approved'] = False
         if 'is_sent_examiner' in params:
-            query_dict['examiner__isnull'] = False
+            query_dict['is_sent_for_cheeck'] = True
+            query_dict['is_examinar_approved'] = False
         test_papers = TestPaper.objects.filter(
            **query_dict
         ).annotate(question=ArrayAgg('questions__question'),
                    question_ids=ArrayAgg('questions'),
+                   is_checker_pending=Case(
+                       When((Q(checker__isnull=False)&Q(is_checker_approved=False)), then=True),
+                       default=False, output_field=BooleanField()
+                   ),
+                    is_examiner_pending=Case(
+                       When((Q(examiner__isnull=False)&Q(is_examinar_approved=False)), then=True),
+                       default=False, output_field=BooleanField()
+                   ),
         answers=ArrayAgg('questions__answer__answer')
         ).values("id", 'question', 'answers', 'total_marks', 'cut_off_marks',
         'subject__subject_name', 'is_checker_approved', 'is_examinar_approved',
-        'checker_review', 'examiner_review', 'question_ids'
+        'checker_review', 'examiner_review', 'question_ids', 'is_checker_pending', 'is_examiner_pending', "is_sent_for_cheeck"
         )
         return Response({"result": test_papers}, status=status.HTTP_200_OK)
 
@@ -236,7 +245,7 @@ class TestPaperSetterSubmission(APIView):
         answers=ArrayAgg('questions__answer__answer')
         ).values('question', 'answers', 'total_marks', 'cut_off_marks',
         'subject__subject_name', 'is_checker_approved', 'is_examinar_approved',
-        'checker_review', 'examiner_review'
+        'checker_review', 'examiner_review', "is_sent_for_cheeck"
         )
         return Response({"result": test_papers}, status=status.HTTP_200_OK)
 
@@ -249,15 +258,50 @@ class TestPaperSetterSubmission(APIView):
         testpepr_obj.save()
         return Response({"message": "Sent For checking"}, status=status.HTTP_200_OK)
 
+class TestPapersListSetterView(APIView):
+    model = TestPaper
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user =request.user
+        dic = {'is_active': True,
+                    'is_delete': False, "is_sent_for_cheeck": True}
+        profile_ch = user.profile_set.first().profile_choice
+        if profile_ch == "1":
+            dic['checker__isnull'] = True
+        elif profile_ch == "2":
+            dic['checker__isnull'] = False
+            dic['is_checker_approved'] = True
+            dic['examiner__isnull'] = True
+        test_papers = TestPaper.objects.filter(
+           **dic
+        ).annotate(question=ArrayAgg('questions__question'),
+                question_ids=ArrayAgg('questions'),
+                is_checker_pending=Case(
+                    When((Q(checker__isnull=False)&Q(is_checker_approved=False)), then=True),
+                    default=False, output_field=BooleanField()
+                ),
+                is_examiner_pending=Case(
+                    When((Q(examiner__isnull=False)&Q(is_examinar_approved=False)), then=True),
+                    default=False, output_field=BooleanField()
+                ),
+        answers=ArrayAgg('questions__answer__answer')
+        ).values("id", 'question', 'answers', 'total_marks', 'cut_off_marks',
+        'subject__subject_name', 'is_checker_approved', 'is_examinar_approved',
+        'checker_review', 'examiner_review', 'question_ids', 'is_checker_pending', 'is_examiner_pending', "is_sent_for_cheeck", "setter__username",
+        "checker__username", "examiner__username"
+        )
+        print(test_papers.count())
+        return Response(test_papers, status=status.HTTP_200_OK)
+
 class TestPaperCheckerAcception(APIView):
     model = TestPaper
     permission_classes = [IsAuthenticated]
-    
-    
+
+
     def get(self, request):
         qp_id = request.query_params.get('testpaper_id')
         testpaper = self.model.objects.get(id=qp_id)
-        # TODO ned to update after authorization
         user = request.user
         testpaper.checker = user
         testpaper.save()
@@ -270,7 +314,7 @@ class TestPaperCheckerAcception(APIView):
             "Cut Off Marks": testpaper.cut_off_marks
         }
         return Response(response, status=status.HTTP_200_OK)
-    
+
     def post(self, request):
         import json
         data = request.data
@@ -281,20 +325,71 @@ class TestPaperCheckerAcception(APIView):
             return Response({"message": "Approval is Required"}, status=status.HTTP_400_BAD_REQUEST)
         checker_message = data.get('messgae')
         approval = data['approval'] == "True"
-        testpaper_obj.is_checker_approved = approval
-        check_paper_obj, is_created = CheckingTestPaper.objects.get_or_create(test_paper_id=testpaper_obj.id)
-        testpaper_obj.checker_review = checker_message
-        check_paper_obj.checker_review = checker_message
-        check_paper_obj.is_checker_approved = approval
-        check_paper_obj.save()
+        user = request.user
+        profile_ch = user.profile_set.first().profile_choice
         response = {
             'message': 'paper is approved By Checker Sent to Examiner'
         }
-        if not approval:
-            testpaper_obj.checker = None
-            testpaper_obj.is_sent_for_cheeck = False
-            response['message'] = "Paper is Not approved please check"
+        if profile_ch == "1":
+            testpaper_obj.is_checker_approved = approval
+            testpaper_obj.checker_review = checker_message
+            if not approval:
+                response['message'] = "Paper is Not approved please check"
+                testpaper_obj.checker = None
+                testpaper_obj.is_sent_for_cheeck = False
+            
+        elif profile_ch == "2":
+            testpaper_obj.is_examinar_approved = approval
+            testpaper_obj.examiner = checker_message
+            if not approval:
+                testpaper_obj.is_checker_approved = approval
+                testpaper_obj.is_sent_for_cheeck = False
+                testpaper_obj.checker = None
+                testpaper_obj.examiner = None
+                response['message'] = "Paper is Not approved please check"
+                
+
+        # check_paper_obj, is_created = CheckingTestPaper.objects.get_or_create(test_paper_id=testpaper_obj.id)
+        
+        # check_paper_obj.checker_review = checker_message
+        # check_paper_obj.is_checker_approved = approval
+        # check_paper_obj.save()
+
+        # if not approval:
+        #     testpaper_obj.checker = None
+        #     testpaper_obj.is_sent_for_cheeck = False
         testpaper_obj.save()
         return Response(response, status=status.HTTP_200_OK)
 
-
+class TestPaperAcceptedList(APIView):
+    model = TestPaper
+    permission_classes = [IsAuthenticated]   
+    
+    def get(self, request):
+        user =request.user
+        dic = {'is_active': True,
+                    'is_delete': False}
+        profile_ch = user.profile_set.first().profile_choice
+        if profile_ch == "1":
+            dic['checker_id'] = user.id
+        elif profile_ch == "2":
+            dic['examiner_id'] = user.id
+        test_papers = TestPaper.objects.filter(
+           **dic
+        ).annotate(question=ArrayAgg('questions__question'),
+                question_ids=ArrayAgg('questions'),
+                is_checker_pending=Case(
+                    When((Q(checker__isnull=False)&Q(is_checker_approved=False)), then=True),
+                    default=False, output_field=BooleanField()
+                ),
+                is_examiner_pending=Case(
+                    When((Q(examiner__isnull=False)&Q(is_examinar_approved=False)), then=True),
+                    default=False, output_field=BooleanField()
+                ),
+        answers=ArrayAgg('questions__answer__answer')
+        ).values("id", 'question', 'answers', 'total_marks', 'cut_off_marks',
+        'subject__subject_name', 'is_checker_approved', 'is_examinar_approved',
+        'checker_review', 'examiner_review', 'question_ids', 'is_checker_pending', 'is_examiner_pending', "is_sent_for_cheeck", "setter__username",
+        "checker__username", "examiner__username"
+        )
+        return Response(test_papers, status=status.HTTP_200_OK)

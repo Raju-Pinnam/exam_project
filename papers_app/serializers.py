@@ -12,6 +12,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         # data = super().to_representation(instance)
         user_choices = dict([("0",'Setter'),("2" ,'Examinar'),("1",'Checker')])
+        print(instance.profile_choice)
         return {
             'id': instance.id,
             'user_id': instance.user.id,

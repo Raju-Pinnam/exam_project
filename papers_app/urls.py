@@ -14,4 +14,6 @@ urlpatterns = [
     path('test_papers_list_checker/', TestPaperSetterSubmission.as_view(), name='test_papers_list_checker'),
     path('checker_test_approval/', TestPaperCheckerAcception.as_view(),
         name='checker_test_approval'),
+    path('test_papers_list/sent/to/verify/', TestPapersListSetterView.as_view()),
+    path('test_paper/accepted/list/', TestPaperAcceptedList.as_view()),
 ]

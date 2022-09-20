@@ -91,6 +91,13 @@ class SubjectsList(APIView):
                                         is_delete=False)
         serializer = SubjectSerializer(subjects, many=True).data
         return Response(serializer, status=status.HTTP_200_OK)
+    
+    def post(self, request):
+        if "subject_name" not in request.data:
+            return Response({"message": "Subject name required"}, status=status.HTTP_400_BAD_REQUEST)
+        subject = Subject.objects.get_or_create(subject_name=request.data['subject_name'])
+        serializer = SubjectSerializer(subject).data
+        return Response(serializer, status=status.HTTP_200_OK)
 
 
 class QuestionApiView(APIView):
@@ -188,6 +195,15 @@ class TestPaperCreationView(CreateAPIView):
         test_paper_obj.questions.add(*questions)
         test_paper_obj.save()
         return Response({"message": "Test Paper is created"}, status=status.HTTP_201_CREATED)
+    
+    def delete(self, request):
+        pk = request.query_params['pk']
+        user = request.user
+        obj = get_object_or_404(TestPaper, pk=pk)
+        if obj.setter.id != user.id:
+            return Response("Dont have permission to delete")
+        obj.delete()
+        return Response("Deleted")
 
 class TestPaperListView(APIView):
     model = TestPaper
@@ -324,7 +340,7 @@ class TestPaperCheckerAcception(APIView):
         if "approval" not in data:
             return Response({"message": "Approval is Required"}, status=status.HTTP_400_BAD_REQUEST)
         checker_message = data.get('messgae')
-        approval = data['approval'] == "True"
+        approval = data['approval'] == True
         user = request.user
         profile_ch = user.profile_set.first().profile_choice
         response = {
@@ -340,7 +356,9 @@ class TestPaperCheckerAcception(APIView):
             
         elif profile_ch == "2":
             testpaper_obj.is_examinar_approved = approval
-            testpaper_obj.examiner = checker_message
+            testpaper_obj.examiner_review = checker_message
+            testpaper_obj.examiner = user
+            testpaper_obj
             if not approval:
                 testpaper_obj.is_checker_approved = approval
                 testpaper_obj.is_sent_for_cheeck = False
@@ -370,8 +388,16 @@ class TestPaperAcceptedList(APIView):
         dic = {'is_active': True,
                     'is_delete': False}
         profile_ch = user.profile_set.first().profile_choice
+        if "is_verified" in request.query_params:
+            dic['is_examinar_approved'] = True
+            dic['is_checker_approved'] = True
+            if profile_ch == '0':
+                dic['setter_id'] = user.id
         if profile_ch == "1":
             dic['checker_id'] = user.id
+            if "is_verified" in request.query_params:
+                dic['is_examinar_approved'] = True
+                dic['is_checker_approved'] = True
         elif profile_ch == "2":
             dic['examiner_id'] = user.id
         test_papers = TestPaper.objects.filter(

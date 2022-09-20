@@ -95,7 +95,7 @@ class SubjectsList(APIView):
     def post(self, request):
         if "subject_name" not in request.data:
             return Response({"message": "Subject name required"}, status=status.HTTP_400_BAD_REQUEST)
-        subject = Subject.objects.get_or_create(subject_name=request.data['subject_name'])
+        subject, is_cr = Subject.objects.get_or_create(subject_name=request.data['subject_name'])
         serializer = SubjectSerializer(subject).data
         return Response(serializer, status=status.HTTP_200_OK)
 
